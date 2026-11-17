@@ -17,6 +17,15 @@ const CAT_LABEL = {
   staple: "主食", breakfast: "早餐",
 };
 
+// 各字段的取值范围：唯一来源（钳制与设置面板的 min/max 都用它，避免两处数字漂移）
+const LIMITS = {
+  servings: [1, 8],
+  meat: [0, 8],
+  veg: [0, 8],
+  soup: [0, 8],
+  recentDays: [0, 60],
+};
+
 const today = () => new Date().toLocaleDateString("sv");        // 2026-11-17
 const seedOf = (day) => Number(day.replaceAll("-", "")) || 1;
 
@@ -88,10 +97,12 @@ function chooseDay(forceNew) {
     avoid: s.avoid, recentDays: s.recentDays, history, today: day,
   };
 
+  const wantNow = (s.meat || 0) + (s.veg || 0) + (s.soup || 0);
   if (!forceNew && Array.isArray(history[day]) && history[day].length) {
     const byName = new Map(state.dishes.map((d) => [d.name, d]));
     const reuse = history[day].map((n) => byName.get(n)).filter(Boolean);
-    if (reuse.length) return reuse;
+    // 换了设置里的道数（比如荤菜从 1 改成 6）就重挑，不能沿用当天旧的一批
+    if (reuse.length && reuse.length === wantNow) return reuse;
   }
 
   let chosen = pick(state.dishes, opts, forceNew ? Date.now() : seedOf(day));
@@ -204,10 +215,23 @@ function renderAll() {
 }
 
 // ---------------------------------------------------------------- 设置
+const clampTo = (k, v) => {
+  const [lo, hi] = LIMITS[k] || [0, 999];
+  const num = Number(v);
+  if (!Number.isFinite(num)) return DEFAULTS[k];
+  return Math.min(hi, Math.max(lo, Math.round(num)));
+};
+
 function openSettings() {
   const s = state.settings;
   const f = $("#settings-form");
-  for (const k of ["servings", "meat", "veg", "soup", "recentDays"]) f.elements[k].value = s[k];
+  for (const k of ["servings", "meat", "veg", "soup", "recentDays"]) {
+    const input = f.elements[k];
+    const [lo, hi] = LIMITS[k];
+    input.min = lo;
+    input.max = hi;
+    input.value = s[k];
+  }
   f.elements.avoid.value = (s.avoid || []).join(",");
   $("#dlg").showModal();
 }
@@ -218,18 +242,17 @@ function bindSettings() {
   dlg.addEventListener("close", () => {
     const action = dlg.returnValue;
     if (action === "save") {
-      const n = (k) => Math.max(0, Number(form.elements[k].value) || 0);
       state.settings = {
         ...state.settings,
-        servings: Math.min(8, Math.max(1, n("servings") || 2)),
-        meat: Math.min(3, n("meat")),
-        veg: Math.min(3, n("veg")),
-        soup: Math.min(2, n("soup")),
-        recentDays: Math.min(60, n("recentDays")),
+        servings: clampTo("servings", form.elements.servings.value) || DEFAULTS.servings,
+        meat: clampTo("meat", form.elements.meat.value),
+        veg: clampTo("veg", form.elements.veg.value),
+        soup: clampTo("soup", form.elements.soup.value),
+        recentDays: clampTo("recentDays", form.elements.recentDays.value),
         avoid: form.elements.avoid.value.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean),
       };
       store.set(KEY.settings, state.settings);
-      reroll(false);
+      reroll(true);
       toast("设置已保存");
     } else if (action === "clear") {
       store.set(KEY.history, {});

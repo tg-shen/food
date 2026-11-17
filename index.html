@@ -40,6 +40,34 @@
     <label>汤 <input name="soup" type="number" min="0" max="8" step="1"></label>
     <label>最近多少天不重复 <input name="recentDays" type="number" min="0" max="60" step="1"></label>
     <label class="wide">忌口（逗号分隔） <input name="avoid" type="text" placeholder="香菜,苦瓜"></label>
+
+    <hr>
+    <h3>我的菜（只在本机）</h3>
+    <div id="custom-list"></div>
+    <details id="custom-add">
+      <summary>＋ 添加一道</summary>
+      <label class="wide">菜名 <input name="c-name" type="text" placeholder="例如 番茄牛腩"></label>
+      <label>类型
+        <select name="c-cat">
+          <option value="meat_dish">荤菜</option>
+          <option value="aquatic">水产</option>
+          <option value="vegetable_dish">素菜</option>
+          <option value="soup">汤</option>
+        </select>
+      </label>
+      <label>一份够几人 <input name="c-base" type="number" min="1" max="8" step="1" value="2"></label>
+      <label class="wide">配料（一行一条，如「牛腩 500g」「番茄 2个」「盐 适量」）
+        <textarea name="c-ings" rows="5" placeholder="牛腩 500g&#10;番茄 2个&#10;盐 适量"></textarea>
+      </label>
+      <menu>
+        <button type="button" id="btn-custom-add" class="primary">保存这道菜</button>
+      </menu>
+    </details>
+    <menu>
+      <button type="button" id="btn-custom-share">分享我的菜</button>
+      <button type="button" id="btn-custom-import">导入</button>
+    </menu>
+
     <menu>
       <button value="cancel" type="submit">取消</button>
       <button value="clear" type="submit" id="btn-clear">清空历史</button>

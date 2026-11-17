@@ -1,10 +1,11 @@
 // app.js —— 渲染与交互；挑菜/折算/清单逻辑全在 meal-core.js
-import { pick, factorOf, fmtAmt, buildShopping } from "./meal-core.js";
+import { pick, factorOf, fmtAmt, buildShopping, makeCustomDish } from "./meal-core.js";
 
 const KEY = {
   settings: "meal.settings",
   history: "meal.history",
   expanded: "meal.expanded",
+  custom: "meal.customDishes",
   checked: (day) => `meal.checked.${day}`,
 };
 
@@ -81,7 +82,10 @@ function toast(msg) {
 }
 
 // ---------------------------------------------------------------- 挑菜
-let state = { dishes: [], settings: DEFAULTS, chosen: [], day: today(), shopping: [] };
+let state = { dishes: [], custom: [], settings: DEFAULTS, chosen: [], day: today(), shopping: [] };
+
+// 内置菜 + 本机自定义菜（自定义的存在 localStorage，和内置菜同等参与挑菜/折算/清单）
+const allDishes = () => state.dishes.concat(state.custom || []);
 
 function loadSettings() {
   const s = store.get(KEY.settings, {});
@@ -99,18 +103,18 @@ function chooseDay(forceNew) {
 
   const wantNow = (s.meat || 0) + (s.veg || 0) + (s.soup || 0);
   if (!forceNew && Array.isArray(history[day]) && history[day].length) {
-    const byName = new Map(state.dishes.map((d) => [d.name, d]));
+    const byName = new Map(allDishes().map((d) => [d.name, d]));
     const reuse = history[day].map((n) => byName.get(n)).filter(Boolean);
     // 换了设置里的道数（比如荤菜从 1 改成 6）就重挑，不能沿用当天旧的一批
     if (reuse.length && reuse.length === wantNow) return reuse;
   }
 
-  let chosen = pick(state.dishes, opts, forceNew ? Date.now() : seedOf(day));
+  let chosen = pick(allDishes(), opts, forceNew ? Date.now() : seedOf(day));
   // "换一批"尽量不要跟当前这组一样
   if (forceNew && state.chosen.length) {
     const before = state.chosen.map((d) => d.name).join("|");
     for (let i = 0; i < 5 && chosen.map((d) => d.name).join("|") === before; i++) {
-      chosen = pick(state.dishes, opts, Date.now() + i * 7919);
+      chosen = pick(allDishes(), opts, Date.now() + i * 7919);
     }
   }
   history[day] = chosen.map((d) => d.name);
@@ -263,6 +267,100 @@ function bindSettings() {
   });
 }
 
+// ---------------------------------------------------------------- 我的菜（只在本机）
+function saveCustom(list) {
+  state.custom = list;
+  store.set(KEY.custom, list);
+}
+
+function renderCustomList() {
+  const box = $("#custom-list");
+  box.replaceChildren();
+  const list = state.custom || [];
+  if (!list.length) {
+    box.append(el("p", { class: "hint", text: "还没有自定义菜。加一道，它会和内置菜一起参与挑菜（只存这台设备）。" }));
+    return;
+  }
+  const ul = el("ul", { class: "custom" });
+  for (const d of list) {
+    ul.append(el("li", {},
+      el("span", { class: "name", text: `${d.name}（${CAT_LABEL[d.cat] || d.cat} · ${d.ings.length} 样料）` }),
+      el("button", { type: "button", class: "del", "data-name": d.name, text: "删除" })));
+  }
+  box.append(ul);
+  for (const btn of ul.querySelectorAll("button.del")) {
+    btn.addEventListener("click", () => {
+      saveCustom((state.custom || []).filter((x) => x.name !== btn.dataset.name));
+      renderCustomList();
+      toast("已删除");
+    });
+  }
+}
+
+function bindCustom() {
+  const form = $("#settings-form");
+
+  $("#btn-custom-add").addEventListener("click", () => {
+    const dish = makeCustomDish({
+      name: form.elements["c-name"].value,
+      cat: form.elements["c-cat"].value,
+      base: form.elements["c-base"].value,
+      ingsText: form.elements["c-ings"].value,
+    });
+    if (!dish) {
+      toast("菜名 + 至少一条配料");
+      return;
+    }
+    if ((state.custom || []).some((d) => d.name === dish.name)) {
+      toast("已经有一道同名的了");
+      return;
+    }
+    saveCustom([...(state.custom || []), dish]);
+    renderCustomList();
+    form.elements["c-name"].value = "";
+    form.elements["c-ings"].value = "";
+    toast("已添加：点「换一批」就能挑到它");
+  });
+
+  $("#btn-custom-share").addEventListener("click", async () => {
+    const text = JSON.stringify(state.custom || []);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "我的菜", text });
+        return;
+      }
+    } catch { /* 用户取消 */ }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("已复制，发给家人点「导入」粘贴");
+    } catch {
+      window.prompt("复制这段发给家人：", text);
+    }
+  });
+
+  $("#btn-custom-import").addEventListener("click", () => {
+    const text = window.prompt("粘贴对方「分享我的菜」的内容：");
+    if (!text) return;
+    try {
+      const incoming = JSON.parse(text);
+      if (!Array.isArray(incoming)) throw new Error("not array");
+      const have = new Set((state.custom || []).map((d) => d.name));
+      const valid = incoming.filter(
+        (d) => d && d.name && Array.isArray(d.ings) && d.ings.length && !have.has(d.name),
+      );
+      if (!valid.length) {
+        toast("没有新菜可导入");
+        return;
+      }
+      saveCustom([...(state.custom || []), ...valid]);
+      renderCustomList();
+      toast(`导入了 ${valid.length} 道`);
+    } catch {
+      toast("导入失败：内容不是有效的菜 JSON");
+    }
+  });
+}
+
 // ---------------------------------------------------------------- 分享
 function shareText() {
   const lines = [`${state.day} 今晚吃什么（${state.settings.servings} 人份）`];
@@ -321,7 +419,10 @@ async function boot() {
   }
 
   state.dishes = data.dishes || [];
+  state.custom = store.get(KEY.custom, []);
   bindSettings();
+  bindCustom();
+  renderCustomList();
   $("#btn-again").addEventListener("click", () => { reroll(true); toast("换好了"); });
   $("#btn-settings").addEventListener("click", openSettings);
   $("#btn-share").addEventListener("click", share);

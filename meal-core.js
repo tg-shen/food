@@ -65,6 +65,84 @@ export function factorOf(dish, servings, ppf) {
   return Math.min(2, Math.max(0.5, servings / base));
 }
 
+// ---------------------------------------------------------------- 自定义菜
+// 解析"配料一行一条"，支持：番茄 300g / 鸡蛋 2个 / 盐 适量 / 花椒 6 粒 / 猪肉 300 克
+const MASS_UNITS = [
+  ["千克", "g", 1000], ["公斤", "g", 1000], ["kg", "g", 1000],
+  ["克", "g", 1], ["g", "g", 1],
+  ["毫升", "ml", 1], ["ml", "ml", 1],
+  ["升", "ml", 1000], ["L", "ml", 1000], ["l", "ml", 1000],
+  ["斤", "g", 500], ["两", "g", 50],
+];
+const CNT_UNITS = ["个", "颗", "枚", "只", "根", "片", "瓣", "块", "把", "粒",
+  "张", "条", "碗", "杯", "汤匙", "茶匙", "勺", "滴", "包", "袋", "罐"];
+const ALL_UNITS = [...MASS_UNITS.map((u) => u[0]), ...CNT_UNITS]
+  .sort((a, b) => b.length - a.length);          // 长单位优先（"汤匙"先于"匙"）
+const UNIT_ALT = ALL_UNITS.map((u) => u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+const QTY_UNIT_RE = new RegExp(
+  `(\\d+(?:\\.\\d+)?)\\s*(?:[-~～到至]\\s*(\\d+(?:\\.\\d+)?))?\\s*(${UNIT_ALT})`,
+);
+const NUM_RE = /\d+(?:\.\d+)?/g;
+
+/** 一行配料 -> ing 对象（与 dishes.json 同构）；解析不出来就当"适量"。 */
+export function parseIngredientLine(line) {
+  const text = String(line || "").replace(/^[\s\-*+·]+/, "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  const m = QTY_UNIT_RE.exec(text);
+  if (!m) {
+    // 没有"数量+单位"：拆成 名称 + 观感用量（盐 适量 / 葱 少许 / 花椒 按口味）
+    const vague = /^(.*?)\s+(适量|少许|少量|一些|若干|按需|按口味|个人口味|够用|随意)$/.exec(text);
+    if (vague && vague[1].trim()) {
+      return { n: vague[1].trim(), v: null, k: null, u: "", raw: vague[2], opt: 0 };
+    }
+    const name = text.replace(/[:：].*$/, "").trim();
+    if (!name) return null;
+    return { n: name, v: null, k: null, u: "", raw: "适量", opt: 0 };
+  }
+
+  const name = text.slice(0, m.index).replace(/[:：,，;；\s]+$/, "").trim();
+  if (!name) return null;
+
+  const rawUnit = m[3];
+  const mass = MASS_UNITS.find((u) => u[0] === rawUnit);
+  let v;
+  if (m[2]) v = (Number(m[1]) + Number(m[2])) / 2;      // 3~4 斤 取中值
+  else v = Number(m[1]);
+  if (mass) {
+    const [, unit, mul] = mass;
+    return { n: name, v: v * mul, k: "mass", u: unit, raw: text.slice(m.index).trim(), opt: 0 };
+  }
+  return { n: name, v, k: "count", u: rawUnit, raw: text.slice(m.index).trim(), opt: 0 };
+}
+
+/** 多行文本 -> ing 数组（空行跳过）。 */
+export function parseCustomIngredients(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map(parseIngredientLine)
+    .filter(Boolean);
+}
+
+/** 表单 -> 一道可参与挑菜的菜（缺的字段留空，渲染时会自动省略）。 */
+export function makeCustomDish({ name, cat, base, ingsText }) {
+  const title = String(name || "").trim();
+  const ings = parseCustomIngredients(ingsText);
+  if (!title || !ings.length) return null;
+  const b = Number(base);
+  return {
+    name: title,
+    title,
+    cat: cat || "meat_dish",
+    diff: "", min: null, kcal: null,
+    base: Number.isFinite(b) && b > 0 ? b : 2,
+    range: null,
+    need: ings.map((i) => i.n).join(" "),
+    ings,
+    custom: 1,
+  };
+}
+
 export function fmtMass(v) {
   if (v >= 1000) return `${+(v / 1000).toFixed(2)} kg`;
   if (v >= 100) return `${Math.round(v / 10) * 10} g`;

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e8590c">
+<title>今天吃什么</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1 id="head-date">今天吃什么</h1>
+  <p id="head-sub"></p>
+</header>
+
+<p id="status" role="status" hidden></p>
+
+<main id="cards"></main>
+
+<section id="shop">
+  <h2>采购清单</h2>
+  <div id="shop-body"></div>
+  <p class="hint" id="shop-hint"></p>
+</section>
+
+<nav>
+  <button id="btn-again" type="button">换一批</button>
+  <button id="btn-settings" type="button">设置</button>
+  <button id="btn-share" type="button">分享</button>
+</nav>
+
+<dialog id="dlg">
+  <form method="dialog" id="settings-form">
+    <h2>设置</h2>
+    <label>人数 <input name="servings" type="number" min="1" max="8" step="1"></label>
+    <label>荤菜 <input name="meat" type="number" min="0" max="3" step="1"></label>
+    <label>素菜 <input name="veg" type="number" min="0" max="3" step="1"></label>
+    <label>汤 <input name="soup" type="number" min="0" max="2" step="1"></label>
+    <label>最近多少天不重复 <input name="recentDays" type="number" min="0" max="60" step="1"></label>
+    <label class="wide">忌口（逗号分隔） <input name="avoid" type="text" placeholder="香菜,苦瓜"></label>
+    <menu>
+      <button value="cancel" type="submit">取消</button>
+      <button value="clear" type="submit" id="btn-clear">清空历史</button>
+      <button value="save" type="submit" class="primary">保存</button>
+    </menu>
+  </form>
+</dialog>
+
+<div id="toast" hidden></div>
+
+<noscript><p>这个页面需要 JavaScript。</p></noscript>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'meal-v1-b58daac5-5';
+const CACHE_VERSION = 'meal-v1-b58daac5-6';
 const SHELL = [
   'index.html',
   'style.css',

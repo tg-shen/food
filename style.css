@@ -115,16 +115,16 @@ dialog label {
 dialog label.wide { display: block; }
 dialog label.wide input { width: 100%; margin-top: 6px; }
 dialog input[type="number"], dialog input[type="text"] {
-  padding: 8px 10px; font-size: 15px; color: var(--fg);
+  padding: 8px 10px; font-size: 16px; color: var(--fg);   /* 16px：iOS 聚焦时不会自动放大页面 */
   background: var(--card); border: 1px solid var(--line); border-radius: 8px;
 }
-dialog input[type="number"] { width: 84px; text-align: right; }
+dialog input[type="number"] { width: 92px; text-align: right; }
 dialog menu {
   display: flex; gap: 8px; justify-content: flex-end;
   margin: 16px 0 0; padding: 0;
 }
 dialog menu button {
-  padding: 10px 14px; font-size: 15px; border-radius: 9px;
+  padding: 11px 14px; font-size: 15px; border-radius: 9px;   /* ≥44px，手指好点 */
   border: 1px solid var(--line); background: var(--card); color: var(--fg);
 }
 dialog menu button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -145,12 +145,12 @@ dialog menu button.primary { background: var(--accent); border-color: var(--acce
 dialog hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0 10px; }
 dialog h3 { margin: 0 0 6px; font-size: 15px; }
 dialog textarea {
-  width: 100%; margin-top: 6px; padding: 8px 10px; font: inherit; font-size: 14px;
+  width: 100%; margin-top: 6px; padding: 8px 10px; font: inherit; font-size: 16px;   /* 同上：防 iOS 放大 */
   color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   resize: vertical;
 }
 dialog select {
-  padding: 8px 10px; font-size: 15px; color: var(--fg);
+  padding: 8px 10px; font-size: 16px; color: var(--fg);
   background: var(--card); border: 1px solid var(--line); border-radius: 8px;
 }
 ul.custom { list-style: none; margin: 0 0 8px; padding: 0; }
@@ -165,3 +165,27 @@ ul.custom button.del {
 }
 #custom-add summary { cursor: pointer; color: var(--accent); font-size: 14px; padding: 6px 0; }
 #custom-add input[type="text"] { flex: 1 1 auto; text-align: left; }
+/* ---------------------------------------------------------------- 触摸手感 */
+/* 去掉 Chrome/Safari 的点击高亮，加按压反馈；交互元素禁长按选中/弹菜单，禁双击缩放延迟 */
+nav button, dialog button, dialog summary, details summary,
+ul.shop label, ul.custom button.del, #btn-again {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.06s ease, opacity 0.06s ease, background-color 0.06s ease;
+}
+nav button:active, dialog menu button:active, dialog button:active,
+ul.custom button.del:active { transform: scale(0.96); }
+ul.shop label:active { background: var(--card); }
+details summary:active, dialog summary:active { opacity: 0.6; }
+
+/* 输入框聚焦时不要出现放大镜/花哨描边，但要能看出焦点 */
+dialog input:focus, dialog textarea:focus, dialog select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 弹窗内部滚动不要带着页面一起滚（iOS 上尤其明显） */
+dialog form { overscroll-behavior: contain; }
